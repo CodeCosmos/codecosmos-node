@@ -22,11 +22,11 @@ var DB_PREFIX = 'userdb-';
 function dbForUser(userName) {
     return DB_PREFIX + Buffer(userName, 'UTF-8').toString('hex');
 }
-function createDatabase(dbName) {
+function createDatabase(ownerId, dbName) {
     // PUT /dbName/, 201 CREATED or 412 ALREADY EXISTS
     var backoffTime = 1000;
     var backoffExp = 1.1;
-    function requestCallback(err, response, body) {
+    function createCallback(err, response, body) {
         if (response.statusCode === 201) {
             console.log('db ' + dbName + ' successfully created');
         } else if (response.statusCode === 412) {
@@ -35,21 +35,55 @@ function createDatabase(dbName) {
             var delay = Math.random() * backoffTime;
             backoffTime = backoffExp * backoffTime;
             if (err) {
-                console.log('error trying to create db ' + db + ' ' + err + ' ' + JSON.stringify(err));
+                console.log('error trying to create db ' + dbName + ' ' + err + ' ' + JSON.stringify(err));
             } else {
-                console.log('bad status trying to create db ' + db + ' ' +
+                console.log('bad status trying to create db ' + dbName + ' ' +
                             response.statusCode + ' ' +
                             http.STATUS_CODES[response.statusCode]);
             }
             console.log('trying again in ' + (delay/1000).toFixed(2) + ' sec');
             setTimeout(doRequest, delay);
+            return;
         }
+        setAdminRole(ownerId, dbName);
     }
     function doRequest() {
         request({method: 'PUT',
                  url: db + '/' + dbName + '/',
                  body: ''},
-                requestCallback);
+                createCallback);
+    }
+    doRequest();
+}
+function setAdminRole(ownerId, dbName) {
+    // PUT /dbName/_security, 201 CREATED?
+    var backoffTime = 1000;
+    var backoffExp = 1.1;
+    function setAdminRoleCallback(err, response, body) {
+        if (response.statusCode === 200) {
+            console.log(dbName + '/_security successfully updated');
+        } else {
+            var delay = Math.random() * backoffTime;
+            backoffTime = backoffExp * backoffTime;
+            if (err) {
+                console.log('error trying to create ' + dbName + '/_security ' + err + ' ' + JSON.stringify(err));
+            } else {
+                console.log('bad status trying to create ' + dbName + '/_security ' +
+                            response.statusCode + ' ' +
+                            http.STATUS_CODES[response.statusCode] + '\n' + body);
+            }
+            console.log('trying again in ' + (delay/1000).toFixed(2) + ' sec');
+            setTimeout(doRequest, delay);
+            return;
+        }
+    }
+    function doRequest() {
+        var security = {admins: {names: [ownerId], roles: []},
+                        members: {names: [ownerId], roles: []}};
+        request({method: 'PUT',
+                 url: db + '/' + dbName + '/_security',
+                 body: JSON.stringify(security)},
+                setAdminRoleCallback);
     }
     doRequest();
 }
@@ -65,7 +99,7 @@ follow(cfg, function (error, change) {
             console.log('Got a delete for ' + id + ' but did not DELETE ' + userDb);
         } else {
             console.log('Creating db ' + userDb + ' for new user ' + id);
-            createDatabase(userDb);
+            createDatabase(id, userDb);
         }
     }
 });
