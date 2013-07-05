@@ -1,0 +1,71 @@
+#!/usr/bin/env node
+// -*- mode: javascript -*-
+var fs = require('fs');
+var follow = require('follow');
+var request = require('request');
+var http = require('http');
+
+if (process.argv.length !== 3) {
+    console.error('USAGE: codecosmos-node config.json');
+    process.exit(1);
+}
+var cfg = JSON.parse(fs.readFileSync(process.argv[2], 'UTF-8'));
+if (!cfg.db) {
+    console.error('CONFIG ERROR: ' + process.argv[2] + ' missing db');
+    process.exit(1);
+}
+cfg.include_docs = true;
+var db = cfg.db.replace(/\/_users\/?$/, '');
+cfg.db = db + '/_users';
+var USER_PREFIX = 'org.couchdb.user:';
+var DB_PREFIX = 'userdb-';
+function dbForUser(userName) {
+    return DB_PREFIX + Buffer(userName, 'UTF-8').toString('hex');
+}
+function createDatabase(dbName) {
+    // PUT /dbName/, 201 CREATED or 412 ALREADY EXISTS
+    var backoffTime = 1000;
+    var backoffExp = 1.1;
+    function requestCallback(err, response, body) {
+        if (response.statusCode === 201) {
+            console.log('db ' + dbName + ' successfully created');
+        } else if (response.statusCode === 412) {
+            console.log('db ' + dbName + ' already exists');
+        } else {
+            var delay = Math.random() * backoffTime;
+            backoffTime = backoffExp * backoffTime;
+            if (err) {
+                console.log('error trying to create db ' + db + ' ' + err + ' ' + JSON.stringify(err));
+            } else {
+                console.log('bad status trying to create db ' + db + ' ' +
+                            response.statusCode + ' ' +
+                            http.STATUS_CODES[response.statusCode]);
+            }
+            console.log('trying again in ' + (delay/1000).toFixed(2) + ' sec');
+            setTimeout(doRequest, delay);
+        }
+    }
+    function doRequest() {
+        request({method: 'PUT',
+                 url: db + '/' + dbName + '/',
+                 body: ''},
+                requestCallback);
+    }
+    doRequest();
+}
+
+follow(cfg, function (error, change) {
+    if (error) {
+        console.log('Got error: ' + JSON.stringify(error));
+    } else if (change.id.indexOf(USER_PREFIX) === 0) {
+        var id = change.id.substring(USER_PREFIX.length);
+        var userDb = dbForUser(id);
+        if (change.deleted) {
+            // Let's not delete for now.
+            console.log('Got a delete for ' + id + ' but did not DELETE ' + userDb);
+        } else {
+            console.log('Creating db ' + userDb + ' for new user ' + id);
+            createDatabase(userDb);
+        }
+    }
+});

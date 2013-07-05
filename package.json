@@ -7,7 +7,7 @@
     },
     "dependencies": {
         "follow": "~0.9.0",
-        "txn": "~0.2.12"
+        "request": "~2.21.0"
     },
     "devDependencies": {
         "grunt": "~0.4.1",
