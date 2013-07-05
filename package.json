@@ -2,7 +2,7 @@
     "name": "codecosmos-node",
     "title": "CodeCosmos node.js backend (for polling the CouchDB instance)",
     "subdomain": "codecosmos-node",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "repository": {
         "type": "git",
         "url": "https://github.com/codecosmos/codecosmos-node.git"

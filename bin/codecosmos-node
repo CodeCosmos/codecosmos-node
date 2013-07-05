@@ -5,16 +5,16 @@ var follow = require('follow');
 var request = require('request');
 var http = require('http');
 
-var cfgFile = process.env['JITSU_CONFIG'];
-if (!cfgFile && process.argv.length !== 3) {
+var cfgJson = process.env['JITSU_CONFIG'];
+if (!cfgJson && process.argv.length !== 3) {
     console.error('USAGE: codecosmos-node config.json');
     process.exit(1);
 } else {
-    cfgFile = process.argv[2];
+    cfgJson = fs.readFileSync(process.argv[2], 'UTF-8');
 }
-var cfg = JSON.parse(fs.readFileSync(cfgFile, 'UTF-8'));
+var cfg = JSON.parse(cfgJson);
 if (!cfg.db) {
-    console.error('CONFIG ERROR: ' + cfgFile + ' missing db');
+    console.error('CONFIG ERROR: missing db in config');
     process.exit(1);
 }
 cfg.include_docs = true;
