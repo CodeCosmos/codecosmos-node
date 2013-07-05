@@ -23,6 +23,12 @@ var db = cfg.db.replace(/\/_users\/?$/, '');
 cfg.db = db + '/_users';
 var USER_PREFIX = 'org.couchdb.user:';
 var DB_PREFIX = 'userdb-';
+var stats = {change: 0, change_success: 0, change_error: 0,
+             db: 0, db_success: 0, db_error: 0,
+             security: 0, security_success: 0, security_error: 0};
+function inc(counter) {
+    stats[counter] = stats[counter] + 1;
+}
 function dbForUser(userName) {
     return DB_PREFIX + Buffer(userName, 'UTF-8').toString('hex');
 }
@@ -30,12 +36,14 @@ function createDatabase(ownerId, dbName) {
     // PUT /dbName/, 201 CREATED or 412 ALREADY EXISTS
     var backoffTime = 1000;
     var backoffExp = 1.1;
+    inc('db');
     function createCallback(err, response, body) {
         if (response.statusCode === 201) {
             console.log('db ' + dbName + ' successfully created');
         } else if (response.statusCode === 412) {
             console.log('db ' + dbName + ' already exists');
         } else {
+            inc('db_error');
             var delay = Math.random() * backoffTime;
             backoffTime = backoffExp * backoffTime;
             if (err) {
@@ -49,6 +57,7 @@ function createDatabase(ownerId, dbName) {
             setTimeout(doRequest, delay);
             return;
         }
+        inc('db_success');
         setAdminRole(ownerId, dbName);
     }
     function doRequest() {
@@ -63,10 +72,12 @@ function setAdminRole(ownerId, dbName) {
     // PUT /dbName/_security, 200 OK
     var backoffTime = 1000;
     var backoffExp = 1.1;
+    inc('security');
     function setAdminRoleCallback(err, response, body) {
         if (response.statusCode === 200) {
             console.log(dbName + '/_security successfully updated');
         } else {
+            inc('security_error');
             var delay = Math.random() * backoffTime;
             backoffTime = backoffExp * backoffTime;
             if (err) {
@@ -80,6 +91,7 @@ function setAdminRole(ownerId, dbName) {
             setTimeout(doRequest, delay);
             return;
         }
+        inc('security_success');
     }
     function doRequest() {
         var security = {admins: {names: [ownerId], roles: []},
@@ -93,9 +105,12 @@ function setAdminRole(ownerId, dbName) {
 }
 
 follow(cfg, function (error, change) {
+    inc('change');
     if (error) {
+        inc('change_error');
         console.log('Got error: ' + JSON.stringify(error));
     } else if (change.id.indexOf(USER_PREFIX) === 0) {
+        inc('change_success');
         var id = change.id.substring(USER_PREFIX.length);
         var userDb = dbForUser(id);
         if (change.deleted) {
@@ -107,3 +122,8 @@ follow(cfg, function (error, change) {
         }
     }
 });
+
+http.createServer(function (req, res) {
+    res.writeHead(200, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify(stats) + '\n');
+}).listen(8080);
