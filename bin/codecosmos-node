@@ -56,7 +56,7 @@ function createDatabase(ownerId, dbName) {
     doRequest();
 }
 function setAdminRole(ownerId, dbName) {
-    // PUT /dbName/_security, 201 CREATED?
+    // PUT /dbName/_security, 200 OK
     var backoffTime = 1000;
     var backoffExp = 1.1;
     function setAdminRoleCallback(err, response, body) {
