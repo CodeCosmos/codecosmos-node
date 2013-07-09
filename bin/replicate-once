@@ -1,0 +1,61 @@
+#!/usr/bin/env node
+// -*- mode: javascript -*-
+var request = require('request');
+var http = require('http');
+
+if (process.argv.length !== 4) {
+    console.error('USAGE: codecosmos-node SOURCE_URL TARGET_URL');
+    process.exit(1);
+}
+var source_url = process.argv[2];
+var target_url = process.argv[3];
+function getDbs(callback) {
+    request({method: 'GET',
+             url: source_url + '/_all_dbs'},
+            function (err, response, body) {
+                var dbs;
+                if (!err) {
+                    dbs = JSON.parse(body).filter(function (db) {
+                        return db.charAt(0) !== '_';
+                    });
+                    console.log('replicating: ' + dbs.join(', '));
+                } else {
+                    console.error(err);
+                }
+                callback(err, dbs);
+            });
+}
+function replicateDb(db, callback) {
+    var body = {source: db,
+                target: target_url + '/' + db,
+                create_target: true};
+    request({method: 'POST',
+             url: source_url + '/_replicate',
+             json: body},
+            callback);
+}
+function callbackList(lst) {
+    if (lst.length === 0) {
+        console.log('DONE!');
+        process.exit(0);
+        return;
+    }
+    var db = lst.shift();
+    replicateDb(db, function (err, response, body) {
+        if (err) {
+            console.error('FAILURE: ' + db + ' ' + err);
+        } else {
+            console.log('SUCCESS: ' + db + ' ' + JSON.stringify(body));
+        }
+        callbackList(lst);
+    });
+}
+getDbs(function (err, dbs) {
+    if (err) {
+        console.log('FAIL: ' + err);
+        process.exit(1);
+        return;
+    }
+    dbs.unshift('_users');
+    callbackList(dbs);
+});
