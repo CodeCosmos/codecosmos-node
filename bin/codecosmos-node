@@ -4,6 +4,7 @@ var fs = require('fs');
 var follow = require('follow');
 var request = require('request');
 var http = require('http');
+var static = require('node-static');
 
 var cfgJson = process.env['JITSU_CONFIG'];
 if (!cfgJson) {
@@ -123,7 +124,12 @@ follow(cfg, function (error, change) {
     }
 });
 
+var file = cfg.static ? new static.Server(cfg.static) : null;
 http.createServer(function (req, res) {
-    res.writeHead(200, {'Content-Type': 'application/json'});
-    res.end(JSON.stringify(stats) + '\n');
-}).listen(8080);
+    if (req.url === '/_stats' || !file) {
+        res.writeHead(200, {'Content-Type': 'application/json'});
+        res.end(JSON.stringify(stats) + '\n');
+    } else {
+        req.addListener('end', file.serve.bind(file, req, res)).resume();
+    }
+}).listen(0|(cfg.port || 8080), cfg.hostname);

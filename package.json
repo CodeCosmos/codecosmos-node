@@ -9,7 +9,8 @@
     },
     "dependencies": {
         "follow": "~0.9.0",
-        "request": "~2.21.0"
+        "request": "~2.21.0",
+        "node-static": "~0.7.0"
     },
     "devDependencies": {
         "grunt": "~0.4.1",
